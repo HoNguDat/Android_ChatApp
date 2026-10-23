@@ -1,23 +1,42 @@
-package com.example.chatapp.ui.auth.navigation
+package com.example.chatapp.ui.navigation
 
+import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.chatapp.ui.auth.LoginScreen
 import com.example.chatapp.ui.auth.RegisterScreen
+import com.example.chatapp.ui.chat.ChatScreen
+import com.example.chatapp.ui.home.HomeScreen
 import com.google.firebase.auth.FirebaseAuth
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
     object Home : Screen("home")
+    object Chat : Screen("chat/{userId}/{userName}") {
+        fun createRoute(userId: String, userName: String): String {
+            val encodedName = Uri.encode(userName)
+            return "chat/$userId/$encodedName"
+        }
+    }
 }
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    // Kiểm tra nếu đã đăng nhập thì vào thẳng Home (mình sẽ dựng Home ở bước sau)
+
+    // Kiểm tra nếu đã đăng nhập thì vào thẳng Home
     val startDestination = if (FirebaseAuth.getInstance().currentUser != null) {
         Screen.Home.route
     } else {
@@ -35,6 +54,7 @@ fun AppNavigation() {
                 }
             )
         }
+
         composable(Screen.Register.route) {
             RegisterScreen(
                 onNavigateToLogin = { navController.popBackStack() },
@@ -45,28 +65,50 @@ fun AppNavigation() {
                 }
             )
         }
+
         composable(Screen.Home.route) {
-            // Màn hình tạm cho bước test
-            HomeScreenPlaceholder(onLogout = {
-                FirebaseAuth.getInstance().signOut()
-                navController.navigate(Screen.Login.route) {
-                    popUpTo(Screen.Home.route) { inclusive = true }
+            HomeScreen(
+                onUserClick = { userId, userName ->
+                    navController.navigate(Screen.Chat.createRoute(userId, userName))
+                },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
                 }
-            })
+            )
+        }
+
+        composable(
+            route = Screen.Chat.route,
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType },
+                navArgument("userName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val rawUserName = backStackEntry.arguments?.getString("userName") ?: ""
+            val userName = Uri.decode(rawUserName)
+
+            ChatScreen(
+                receiverId = userId,
+                receiverName = userName,
+                onBackClick = { navController.popBackStack() }
+            )
         }
     }
 }
 
 @Composable
 fun HomeScreenPlaceholder(onLogout: () -> Unit) {
-    androidx.compose.foundation.layout.Column(
-        modifier = androidx.compose.ui.Modifier.fillMaxSize(),
-        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        androidx.compose.material3.Text("Đăng nhập thành công! Trang chủ sẽ dựng ở Bước 4.")
-        androidx.compose.material3.Button(onClick = onLogout) {
-            androidx.compose.material3.Text("Đăng xuất")
+        Text("Đăng nhập thành công!")
+        Button(onClick = onLogout) {
+            Text("Đăng xuất")
         }
     }
 }
