@@ -1,5 +1,6 @@
 package com.example.chatapp.ui.chat
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.chatapp.data.model.ChatStatus
@@ -10,7 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
+import android.content.Context
 class ChatViewModel(
     private val repository: AuthRepository = AuthRepository()
 ) : ViewModel() {
@@ -20,6 +21,9 @@ class ChatViewModel(
 
     private val _chatStatus = MutableStateFlow<ChatStatus?>(null)
     val chatStatus: StateFlow<ChatStatus?> = _chatStatus.asStateFlow()
+
+    private val _isUploading = MutableStateFlow(false)
+    val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
 
     val currentUserId: String? get() = repository.currentUserId
     private var listenJob: Job? = null
@@ -63,7 +67,19 @@ class ChatViewModel(
     fun sendMessage(receiverId: String, text: String) {
         if (text.isBlank()) return
         viewModelScope.launch {
-            repository.sendMessage(receiverId, text.trim())
+            repository.sendMediaMessage(receiverId, text = text.trim())
+        }
+    }
+
+    // Xử lý upload ảnh và gửi tin nhắn hình ảnh
+    fun sendImageMessage(context: Context, receiverId: String, imageUri: Uri) {
+        viewModelScope.launch {
+            _isUploading.value = true
+            val base64Image = repository.convertUriToBase64(context, imageUri)
+            if (base64Image != null) {
+                repository.sendMediaMessage(receiverId, imageUrl = base64Image)
+            }
+            _isUploading.value = false
         }
     }
 }

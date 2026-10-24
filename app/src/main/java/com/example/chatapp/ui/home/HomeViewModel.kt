@@ -17,13 +17,15 @@ class HomeViewModel(
 
     val searchQuery = MutableStateFlow("")
 
+    // Lắng nghe Real-Time người dùng & tin nhắn mới nhất
     val conversations: StateFlow<List<ChatConversation>> = combine(
         repository.getUsers(),
+        repository.getRecentConversations(),
         searchQuery.debounce(300).distinctUntilChanged()
-    ) { users, query ->
+    ) { users, recentChats, query ->
         val cleanQuery = query.trim()
 
-        // Lọc danh sách user theo số điện thoại (nếu ô tìm kiếm có nội dung)
+        // 1. Lọc danh sách user theo số điện thoại (nếu ô tìm kiếm có nội dung)
         val filteredUsers = if (cleanQuery.isBlank()) {
             users
         } else {
@@ -32,16 +34,26 @@ class HomeViewModel(
             }
         }
 
-        // Chuyển đổi danh sách User sang ChatConversation để hiển thị
-        filteredUsers.map { user ->
-            ChatConversation(
-                otherUser = user,
-                lastMessage = "Chạm để bắt đầu trò chuyện",
-                lastTimestamp = 0L,
-                lastSenderId = "",
-                isRead = true
-            )
+        // 2. Map người dùng với lịch sử trò chuyện gần nhất (nếu có)
+        val conversationList = filteredUsers.map { user ->
+            val recent = recentChats.find { it.otherUser.uid == user.uid }
+            if (recent != null) {
+                // Đã có lịch sử trò chuyện -> Lấy thông tin tin nhắn cuối cùng thực tế
+                recent.copy(otherUser = user)
+            } else {
+                // Chưa từng nhắn tin -> Để thông báo mặc định
+                ChatConversation(
+                    otherUser = user,
+                    lastMessage = "Chạm để bắt đầu trò chuyện",
+                    lastTimestamp = 0L,
+                    lastSenderId = "",
+                    isRead = true
+                )
+            }
         }
+
+        // 3. Sắp xếp danh sách: Cuộc trò chuyện nào có tin nhắn mới hơn sẽ nằm ở trên cùng
+        conversationList.sortedByDescending { it.lastTimestamp }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),

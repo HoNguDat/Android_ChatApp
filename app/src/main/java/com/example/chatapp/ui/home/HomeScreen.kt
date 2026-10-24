@@ -30,7 +30,7 @@ import com.example.chatapp.ui.profile.ProfileScreen
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
+import androidx.compose.material.icons.filled.Shield
 val ZaloPrimaryColor = Color(0xFF0068FF)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,8 +132,8 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.Phone, contentDescription = "Cuộc gọi") },
-                    label = { Text("Danh bạ") },
+                    icon = { Icon(Icons.Default.Shield, contentDescription = "Spam") },
+                    label = { Text("Spam") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = ZaloPrimaryColor,
                         selectedTextColor = ZaloPrimaryColor,
@@ -195,12 +195,12 @@ fun HomeScreen(
                 }
 
                 1 -> {
-                    // TAB 2: DANH BẠ
+                    // TAB 2: Tin nhắn spam
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Danh bạ chưa có dữ liệu", color = Color.Gray, fontSize = 15.sp)
+                        Text("Spam", color = Color.Gray, fontSize = 15.sp)
                     }
                 }
 
@@ -318,8 +318,14 @@ fun ZaloConversationItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val displayText = if (conversation.lastMessage.isBlank() && conversation.lastTimestamp != 0L) {
+                    "[Hình ảnh]"
+                } else {
+                    conversation.lastMessage
+                }
+
                 Text(
-                    text = conversation.lastMessage,
+                    text = displayText,
                     fontSize = 14.sp,
                     fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal,
                     color = if (isUnread) Color.Black else Color.Gray,
@@ -327,7 +333,6 @@ fun ZaloConversationItem(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-
                 if (isUnread) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(

@@ -1,5 +1,8 @@
 package com.example.chatapp.ui.chat
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,18 +24,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.chatapp.data.model.Message
 import com.example.chatapp.ui.home.ZaloPrimaryColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
@@ -44,8 +53,20 @@ fun ChatScreen(
     var messageText by remember { mutableStateOf("") }
     val messages by viewModel.messages.collectAsState()
     val chatStatus by viewModel.chatStatus.collectAsState()
+    val isUploading by viewModel.isUploading.collectAsState()
     val currentUserId = viewModel.currentUserId
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+
+
+    // Trình chọn ảnh từ thiết bị
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            viewModel.sendImageMessage(context, receiverId, selectedUri)
+        }
+    }
 
     // Lời mời nhắn tin chờ người dùng hiện tại xử lý
     val isPendingForMe = chatStatus?.status == "PENDING" && chatStatus?.receiverId == currentUserId
@@ -66,7 +87,6 @@ fun ChatScreen(
 
     Scaffold(
         topBar = {
-            // Thanh TopBar màu xanh Zalo có Nút Quay về, Tên & Icon cuộc gọi
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = ZaloPrimaryColor,
@@ -112,7 +132,9 @@ fun ChatScreen(
             Surface(
                 shadowElevation = 8.dp,
                 color = Color.White,
-                modifier = Modifier.navigationBarsPadding().imePadding()
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .imePadding()
             ) {
                 when {
                     // 1. Trường hợp người dùng nhận được yêu cầu nhắn tin: Hiện banner Chấp nhận / Từ chối
@@ -171,55 +193,67 @@ fun ChatScreen(
 
                     // 3. Khung nhập tin nhắn phong cách Zalo chuẩn
                     else -> {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = {}) {
-                                Icon(Icons.Default.Image, contentDescription = "Image", tint = Color.Gray)
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 40.dp)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(Color(0xFFF1F2F4))
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                BasicTextField(
-                                    value = messageText,
-                                    onValueChange = { messageText = it },
-                                    textStyle = TextStyle(fontSize = 15.sp, color = Color.Black),
+                        Column {
+                            if (isUploading) {
+                                LinearProgressIndicator(
                                     modifier = Modifier.fillMaxWidth(),
-                                    decorationBox = { innerTextField ->
-                                        if (messageText.isEmpty()) {
-                                            Text("Tin nhắn", color = Color.Gray, fontSize = 15.sp)
-                                        }
-                                        innerTextField()
-                                    }
+                                    color = ZaloPrimaryColor
                                 )
                             }
-
-                            Spacer(modifier = Modifier.width(6.dp))
-
-                            // Nút gửi
-                            IconButton(
-                                onClick = {
-                                    if (messageText.isNotBlank()) {
-                                        viewModel.sendMessage(receiverId, messageText)
-                                        messageText = ""
-                                    }
-                                }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Send",
-                                    tint = if (messageText.isNotBlank()) ZaloPrimaryColor else Color.Gray
-                                )
+                                IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Image,
+                                        contentDescription = "Image",
+                                        tint = Color.Gray
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 40.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(Color(0xFFF1F2F4))
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    BasicTextField(
+                                        value = messageText,
+                                        onValueChange = { messageText = it },
+                                        textStyle = TextStyle(fontSize = 15.sp, color = Color.Black),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        decorationBox = { innerTextField ->
+                                            if (messageText.isEmpty()) {
+                                                Text("Tin nhắn", color = Color.Gray, fontSize = 15.sp)
+                                            }
+                                            innerTextField()
+                                        }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                // Nút gửi
+                                IconButton(
+                                    onClick = {
+                                        if (messageText.isNotBlank()) {
+                                            viewModel.sendMessage(receiverId, messageText)
+                                            messageText = ""
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = "Send",
+                                        tint = if (messageText.isNotBlank()) ZaloPrimaryColor else Color.Gray
+                                    )
+                                }
                             }
                         }
                     }
@@ -227,12 +261,11 @@ fun ChatScreen(
             }
         }
     ) { paddingValues ->
-        // Khung hiển thị danh sách tin nhắn
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFE2E7ED)) // Màu nền khung chat xám Zalo
+                .background(Color(0xFFE2E7ED))
         ) {
             LazyColumn(
                 state = listState,
@@ -255,6 +288,23 @@ fun ChatMessageItem(message: Message, isMe: Boolean) {
     val formattedTime = remember(message.timestamp) {
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp))
     }
+    val imageBitmap = remember(message.imageUrl) {
+        if (!message.imageUrl.isNullOrEmpty()) {
+            try {
+                val pureBase64 = if (message.imageUrl.contains(",")) {
+                    message.imageUrl.substringAfter(",")
+                } else {
+                    message.imageUrl
+                }
+                val imageBytes = Base64.decode(pureBase64, Base64.DEFAULT)
+                val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                bitmap?.asImageBitmap()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        } else null
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -271,16 +321,48 @@ fun ChatMessageItem(message: Message, isMe: Boolean) {
                     bottomStart = if (isMe) 16.dp else 2.dp,
                     bottomEnd = if (isMe) 2.dp else 16.dp
                 ),
-                color = if (isMe) Color(0xFFE3F2FD) else Color.White, // Bong bóng màu xanh nhẹ cho người gửi, trắng cho người nhận
+                color = if (isMe) Color(0xFFE3F2FD) else Color.White,
                 shadowElevation = 1.dp,
                 modifier = Modifier.widthIn(max = 280.dp)
             ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    Text(
-                        text = message.text,
-                        fontSize = 15.sp,
-                        color = Color.Black
-                    )
+                Column(modifier = Modifier.padding(8.dp)) {
+                    if (imageBitmap != null) {
+                        Image(
+                            bitmap = imageBitmap,
+                            contentDescription = "Hình ảnh nhắn tin",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 240.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        if (message.text.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    } else if (!message.imageUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = message.imageUrl,
+                            contentDescription = "Hình ảnh nhắn tin",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 240.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        if (message.text.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+
+                    if (message.text.isNotBlank()) {
+                        Text(
+                            text = message.text,
+                            fontSize = 15.sp,
+                            color = Color.Black,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = formattedTime,

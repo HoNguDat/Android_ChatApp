@@ -1,25 +1,32 @@
 package com.example.chatapp.data.repository
 
+import com.example.chatapp.data.model.ChatConversation
+import com.example.chatapp.data.model.ChatStatus
+import com.example.chatapp.data.model.Message
 import com.example.chatapp.data.model.User
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
-import kotlinx.coroutines.tasks.await
-
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import com.example.chatapp.data.model.Message
-import com.example.chatapp.data.model.ChatConversation
-import com.example.chatapp.data.model.ChatStatus
+import kotlinx.coroutines.tasks.await
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
+import java.io.ByteArrayOutputStream
 
 class AuthRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val db: FirebaseDatabase = FirebaseDatabase.getInstance(
         "https://chatapp-7f0b4-default-rtdb.asia-southeast1.firebasedatabase.app"
-    )
+    ),
+    private val storage: FirebaseStorage = FirebaseStorage.getInstance()
 ) {
     val currentUserId: String?
         get() = auth.currentUser?.uid
@@ -102,7 +109,7 @@ class AuthRepository(
     }
 
     // Gửi tin nhắn: Tự động khởi tạo trạng thái PENDING nếu chưa từng chat, chặn nếu đã bị DECLINED
-    suspend fun sendMessage(receiverId: String, text: String): Result<Boolean> {
+    suspend fun sendMediaMessage(receiverId: String, text: String = "", imageUrl: String? = null): Result<Boolean> {
         val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
         val chatRoomId = getChatRoomId(senderId, receiverId)
         val statusRef = db.reference.child("chat_status").child(chatRoomId)
@@ -112,7 +119,6 @@ class AuthRepository(
             val chatStatus = snapshot.getValue(ChatStatus::class.java)
 
             if (chatStatus == null) {
-                // Lần đầu nhắn tin -> Tạo trạng thái chờ (PENDING)
                 val newStatus = ChatStatus(
                     chatRoomId = chatRoomId,
                     initiatorId = senderId,
@@ -121,7 +127,6 @@ class AuthRepository(
                 )
                 statusRef.setValue(newStatus).await()
             } else if (chatStatus.status == "DECLINED") {
-                // Đã bị từ chối -> Không cho gửi
                 return Result.failure(Exception("Cuộc trò chuyện đã bị từ chối"))
             }
 
@@ -133,6 +138,7 @@ class AuthRepository(
                 senderId = senderId,
                 receiverId = receiverId,
                 text = text,
+                imageUrl = imageUrl,
                 timestamp = System.currentTimeMillis()
             )
 
@@ -317,6 +323,38 @@ class AuthRepository(
         return try {
             db.reference.child("chat_status").child(chatRoomId).child("status").setValue(newStatus).await()
             Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Hàm chuyển đổi Uri hình ảnh thành chuỗi Base64 (đã nén nhỏ kích thước)
+    fun convertUriToBase64(context: Context, uri: Uri): String? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val originalBitmap = BitmapFactory.decodeStream(inputStream)
+
+            // Nén kích thước ảnh để giảm dung lượng lưu trữ trên Realtime Database
+            val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, 600, 600, true)
+
+            val outputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+            val byteArray = outputStream.toByteArray()
+
+            "data:image/jpeg;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+    // Upload image
+    suspend fun uploadChatImage(uri: android.net.Uri, chatRoomId: String): Result<String> {
+        return try {
+            val fileName = "${System.currentTimeMillis()}.jpg"
+            val imageRef = storage.reference.child("chat_images/$chatRoomId/$fileName")
+            imageRef.putFile(uri).await()
+            val downloadUrl = imageRef.downloadUrl.await().toString()
+            Result.success(downloadUrl)
         } catch (e: Exception) {
             Result.failure(e)
         }

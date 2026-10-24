@@ -7,5 +7,6 @@ data class Message(
     val text: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val status: String = "PENDING" ,
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val imageUrl: String? = null,
 )
