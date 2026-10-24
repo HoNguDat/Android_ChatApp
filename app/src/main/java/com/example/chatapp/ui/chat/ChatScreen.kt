@@ -1,9 +1,13 @@
 package com.example.chatapp.ui.chat
 
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +18,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Phone
@@ -24,9 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,10 +47,7 @@ import com.example.chatapp.ui.home.ZaloPrimaryColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.graphics.BitmapFactory
-import android.util.Base64
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.foundation.Image
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
@@ -58,6 +64,9 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
+    // State quản lý tin nhắn đang chọn chỉnh sửa
+    var editingMessage by remember { mutableStateOf<Message?>(null) }
+    var editTextFieldValue by remember { mutableStateOf("") }
 
     // Trình chọn ảnh từ thiết bị
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -275,16 +284,68 @@ fun ChatScreen(
             ) {
                 items(messages) { message ->
                     val isMe = message.senderId == viewModel.currentUserId
-                    ChatMessageItem(message = message, isMe = isMe)
+                    ChatMessageItem(
+                        message = message,
+                        isMe = isMe,
+                        onEditClick = {
+                            editingMessage = message
+                            editTextFieldValue = message.text
+                        },
+                        onDeleteClick = {
+                            viewModel.deleteMessage(receiverId, message.messageId)
+                        }
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+        }
+
+        // Dialog Chỉnh sửa tin nhắn
+        if (editingMessage != null) {
+            AlertDialog(
+                onDismissRequest = { editingMessage = null },
+                title = { Text("Chỉnh sửa tin nhắn") },
+                text = {
+                    OutlinedTextField(
+                        value = editTextFieldValue,
+                        onValueChange = { editTextFieldValue = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = false
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            editingMessage?.let { msg ->
+                                viewModel.editMessage(receiverId, msg.messageId, editTextFieldValue)
+                            }
+                            editingMessage = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ZaloPrimaryColor)
+                    ) {
+                        Text("Lưu")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { editingMessage = null }) {
+                        Text("Hủy")
+                    }
+                }
+            )
         }
     }
 }
 
 @Composable
-fun ChatMessageItem(message: Message, isMe: Boolean) {
+fun ChatMessageItem(
+    message: Message,
+    isMe: Boolean,
+    onEditClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {}
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    val isDeleted = message.text == "Tin nhắn đã được xóa"
+
     val formattedTime = remember(message.timestamp) {
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp))
     }
@@ -314,61 +375,98 @@ fun ChatMessageItem(message: Message, isMe: Boolean) {
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
         ) {
-            Surface(
-                shape = RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 16.dp,
-                    bottomStart = if (isMe) 16.dp else 2.dp,
-                    bottomEnd = if (isMe) 2.dp else 16.dp
-                ),
-                color = if (isMe) Color(0xFFE3F2FD) else Color.White,
-                shadowElevation = 1.dp,
-                modifier = Modifier.widthIn(max = 280.dp)
-            ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    if (imageBitmap != null) {
-                        Image(
-                            bitmap = imageBitmap,
-                            contentDescription = "Hình ảnh nhắn tin",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 240.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        if (message.text.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(4.dp))
+            Box {
+                Surface(
+                    shape = RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = if (isMe) 16.dp else 2.dp,
+                        bottomEnd = if (isMe) 2.dp else 16.dp
+                    ),
+                    color = if (isDeleted) Color(0xFFF0F0F0) else if (isMe) Color(0xFFE3F2FD) else Color.White,
+                    shadowElevation = 1.dp,
+                    modifier = Modifier
+                        .widthIn(max = 280.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onLongPress = {
+                                    if (isMe && !isDeleted) {
+                                        showMenu = true
+                                    }
+                                }
+                            )
                         }
-                    } else if (!message.imageUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = message.imageUrl,
-                            contentDescription = "Hình ảnh nhắn tin",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 240.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        if (message.text.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(4.dp))
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        if (!isDeleted) {
+                            if (imageBitmap != null) {
+                                Image(
+                                    bitmap = imageBitmap,
+                                    contentDescription = "Hình ảnh nhắn tin",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 240.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                if (message.text.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                }
+                            } else if (!message.imageUrl.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = message.imageUrl,
+                                    contentDescription = "Hình ảnh nhắn tin",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 240.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                if (message.text.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                }
+                            }
                         }
-                    }
 
-                    if (message.text.isNotBlank()) {
+                        if (message.text.isNotBlank()) {
+                            Text(
+                                text = message.text,
+                                fontSize = 15.sp,
+                                color = if (isDeleted) Color.Gray else Color.Black,
+                                fontStyle = if (isDeleted) FontStyle.Italic else FontStyle.Normal,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = message.text,
-                            fontSize = 15.sp,
-                            color = Color.Black,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            text = formattedTime,
+                            fontSize = 10.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.align(Alignment.End)
                         )
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = formattedTime,
-                        fontSize = 10.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.align(Alignment.End)
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Chỉnh sửa") },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                        onClick = {
+                            showMenu = false
+                            onEditClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Xóa tin nhắn", color = Color.Red) },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) },
+                        onClick = {
+                            showMenu = false
+                            onDeleteClick()
+                        }
                     )
                 }
             }

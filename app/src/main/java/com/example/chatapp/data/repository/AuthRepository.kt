@@ -347,14 +347,33 @@ class AuthRepository(
             null
         }
     }
-    // Upload image
-    suspend fun uploadChatImage(uri: android.net.Uri, chatRoomId: String): Result<String> {
+    // Xóa tin nhắn (Cập nhật text thành "Tin nhắn đã được xóa" và ẩn imageUrl)
+    suspend fun deleteMessage(receiverId: String, messageId: String): Result<Boolean> {
+        val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
+        val chatRoomId = getChatRoomId(senderId, receiverId)
+        val msgRef = db.reference.child("chats").child(chatRoomId).child(messageId)
+
         return try {
-            val fileName = "${System.currentTimeMillis()}.jpg"
-            val imageRef = storage.reference.child("chat_images/$chatRoomId/$fileName")
-            imageRef.putFile(uri).await()
-            val downloadUrl = imageRef.downloadUrl.await().toString()
-            Result.success(downloadUrl)
+            val updates = mapOf(
+                "text" to "Tin nhắn đã được xóa",
+                "imageUrl" to null
+            )
+            msgRef.updateChildren(updates).await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Chỉnh sửa nội dung tin nhắn
+    suspend fun editMessage(receiverId: String, messageId: String, newText: String): Result<Boolean> {
+        val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
+        val chatRoomId = getChatRoomId(senderId, receiverId)
+        val msgRef = db.reference.child("chats").child(chatRoomId).child(messageId)
+
+        return try {
+            msgRef.child("text").setValue(newText).await()
+            Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
         }

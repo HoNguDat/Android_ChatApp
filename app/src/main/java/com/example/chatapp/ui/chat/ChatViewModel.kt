@@ -82,4 +82,17 @@ class ChatViewModel(
             _isUploading.value = false
         }
     }
+
+    fun deleteMessage(receiverId: String, messageId: String) {
+        viewModelScope.launch {
+            repository.deleteMessage(receiverId, messageId)
+        }
+    }
+
+    fun editMessage(receiverId: String, messageId: String, newText: String) {
+        if (newText.isBlank()) return
+        viewModelScope.launch {
+            repository.editMessage(receiverId, messageId, newText.trim())
+        }
+    }
 }

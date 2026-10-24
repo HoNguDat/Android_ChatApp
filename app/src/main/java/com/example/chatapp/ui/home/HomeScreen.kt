@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,7 +29,6 @@ import com.example.chatapp.ui.profile.ProfileScreen
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.material.icons.filled.Shield
 val ZaloPrimaryColor = Color(0xFF0068FF)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,17 +130,6 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.Shield, contentDescription = "Spam") },
-                    label = { Text("Spam") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = ZaloPrimaryColor,
-                        selectedTextColor = ZaloPrimaryColor,
-                        indicatorColor = Color(0xFFE8F1FF)
-                    )
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
                     icon = { Icon(Icons.Default.Person, contentDescription = "Cá nhân") },
                     label = { Text("Cá nhân") },
                     colors = NavigationBarItemDefaults.colors(
@@ -195,17 +182,7 @@ fun HomeScreen(
                 }
 
                 1 -> {
-                    // TAB 2: Tin nhắn spam
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Spam", color = Color.Gray, fontSize = 15.sp)
-                    }
-                }
-
-                2 -> {
-                    // TAB 3: CÁ NHÂN
+                    // TAB 2: CÁ NHÂN
                     ProfileScreen(
                         user = currentUser,
                         isEditing = isEditing,
