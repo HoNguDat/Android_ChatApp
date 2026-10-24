@@ -47,13 +47,33 @@ import com.example.chatapp.ui.home.ZaloPrimaryColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.SolidColor
 
+private val chatBackgroundOptions = listOf(
+    "Mặc định" to Color(0xFFE2E7ED),
+    "Trắng" to Color.White,
+    "Hồng nhạt" to Color(0xFFFCE4EC),
+    "Xanh lá nhạt" to Color(0xFFE8F5E9),
+    "Tím nhạt" to Color(0xFFEDE7F6),
+    "Xám đậm" to Color(0xFF37474F),
+    "Xanh navy" to Color(0xFF0D1B2A),
+    "Đen" to Color(0xFF121212)
+)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     receiverId: String,
     receiverName: String,
     onBackClick: () -> Unit,
+    onNavigateToThemeSettings: () -> Unit = {},
     viewModel: ChatViewModel = viewModel()
 ) {
     var messageText by remember { mutableStateOf("") }
@@ -64,6 +84,23 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
+    // State quản lý việc ẩn/hiện Menu 3 chấm ở TopAppBar
+    var showTopMenu by remember { mutableStateOf(false) }
+
+    // State màu nền khung Chat (Mặc định là màu #E2E7ED)
+    val prefs = remember { context.getSharedPreferences("chat_prefs", Context.MODE_PRIVATE) }
+    var chatBackgroundColor by remember(receiverId) {
+        mutableStateOf(Color(prefs.getInt("bg_$receiverId", 0xFFE2E7ED.toInt())))
+    }
+    // Nền tối thì cả khung nhập, bong bóng, chữ đều chuyển sang bản tối
+    val isDarkBg = chatBackgroundColor.luminance() < 0.5f
+    val barColor = if (isDarkBg) Color(0xFF1E1E1E) else Color.White
+    val inputBg = if (isDarkBg) Color(0xFF2A2A2A) else Color(0xFFF1F2F4)
+    val mainText = if (isDarkBg) Color(0xFFF2F2F2) else Color.Black
+    val subText = if (isDarkBg) Color(0xFFA0A0A0) else Color.Gray
+
+    var showBackgroundDialog by remember { mutableStateOf(false) }
+    var showUnfriendDialog by remember { mutableStateOf(false) }
     // State quản lý tin nhắn đang chọn chỉnh sửa
     var editingMessage by remember { mutableStateOf<Message?>(null) }
     var editTextFieldValue by remember { mutableStateOf("") }
@@ -133,14 +170,52 @@ fun ChatScreen(
                 actions = {
                     IconButton(onClick = {}) { Icon(Icons.Default.Phone, contentDescription = "Call") }
                     IconButton(onClick = {}) { Icon(Icons.Default.Videocam, contentDescription = "Video Call") }
-                    IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, contentDescription = "Menu") }
+                    // --- NÚT 3 CHẤM TOP APP BAR ---
+                    Box {
+                        IconButton(onClick = { showTopMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                        }
+
+                        DropdownMenu(
+                            expanded = showTopMenu,
+                            onDismissRequest = { showTopMenu = false }
+                        ) {
+                            // 1. Chỉnh sửa màu nền
+                            DropdownMenuItem(
+                                text = { Text("Chỉnh sửa màu nền") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Palette, contentDescription = null, tint = Color.Gray)
+                                },
+                                onClick = {
+                                    showTopMenu = false
+                                    showBackgroundDialog = true
+                                }
+                            )
+
+                            // 2. Xóa bạn (Đưa về trạng thái chưa kết bạn/xóa quan hệ)
+                            DropdownMenuItem(
+                                text = { Text("Xóa bạn", color = Color.Red) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = Color.Red
+                                    )
+                                },
+                                onClick = {
+                                    showTopMenu = false
+                                    showUnfriendDialog = true
+                                }
+                            )
+                        }
+                    }
                 }
             )
         },
         bottomBar = {
             Surface(
                 shadowElevation = 8.dp,
-                color = Color.White,
+                color = barColor,
                 modifier = Modifier
                     .navigationBarsPadding()
                     .imePadding()
@@ -157,7 +232,7 @@ fun ChatScreen(
                             Text(
                                 text = "Người này muốn nhắn tin với bạn",
                                 fontSize = 14.sp,
-                                color = Color.Gray
+                                color = subText
                             )
                             Spacer(modifier = Modifier.height(10.dp))
                             Row(
@@ -219,7 +294,7 @@ fun ChatScreen(
                                     Icon(
                                         imageVector = Icons.Default.Image,
                                         contentDescription = "Image",
-                                        tint = Color.Gray
+                                        tint = subText
                                     )
                                 }
 
@@ -228,18 +303,19 @@ fun ChatScreen(
                                         .weight(1f)
                                         .heightIn(min = 40.dp)
                                         .clip(RoundedCornerShape(20.dp))
-                                        .background(Color(0xFFF1F2F4))
+                                        .background(inputBg)
                                         .padding(horizontal = 14.dp, vertical = 10.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
                                     BasicTextField(
                                         value = messageText,
                                         onValueChange = { messageText = it },
-                                        textStyle = TextStyle(fontSize = 15.sp, color = Color.Black),
+                                        textStyle = TextStyle(fontSize = 15.sp, color = mainText),
+                                        cursorBrush = SolidColor(ZaloPrimaryColor),
                                         modifier = Modifier.fillMaxWidth(),
                                         decorationBox = { innerTextField ->
                                             if (messageText.isEmpty()) {
-                                                Text("Tin nhắn", color = Color.Gray, fontSize = 15.sp)
+                                                Text("Tin nhắn", color = subText, fontSize = 15.sp)
                                             }
                                             innerTextField()
                                         }
@@ -260,7 +336,7 @@ fun ChatScreen(
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.Send,
                                         contentDescription = "Send",
-                                        tint = if (messageText.isNotBlank()) ZaloPrimaryColor else Color.Gray
+                                        tint = if (messageText.isNotBlank()) ZaloPrimaryColor else subText
                                     )
                                 }
                             }
@@ -274,7 +350,7 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFE2E7ED))
+                .background(chatBackgroundColor)
         ) {
             LazyColumn(
                 state = listState,
@@ -287,6 +363,7 @@ fun ChatScreen(
                     ChatMessageItem(
                         message = message,
                         isMe = isMe,
+                        darkMode = isDarkBg,
                         onEditClick = {
                             editingMessage = message
                             editTextFieldValue = message.text
@@ -333,13 +410,91 @@ fun ChatScreen(
                 }
             )
         }
+
+        // Bảng màu chọn nền khung chat
+        if (showBackgroundDialog) {
+            AlertDialog(
+                onDismissRequest = { showBackgroundDialog = false },
+                title = { Text("Chọn màu nền") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        chatBackgroundOptions.chunked(4).forEach { rowItems ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                rowItems.forEach { (name, color) ->
+                                    val selected = color == chatBackgroundColor
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .border(
+                                                width = if (selected) 3.dp else 1.dp,
+                                                color = if (selected) ZaloPrimaryColor else Color.LightGray,
+                                                shape = CircleShape
+                                            )
+                                            .clickable {
+                                                chatBackgroundColor = color
+                                                prefs.edit()
+                                                    .putInt("bg_$receiverId", color.toArgb())
+                                                    .apply()
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (selected) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = name,
+                                                tint = if (color.luminance() > 0.5f) Color.Black else Color.White
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showBackgroundDialog = false }) { Text("Xong") }
+                }
+            )
+        }
+
+        // Xác nhận xóa bạn
+        if (showUnfriendDialog) {
+            AlertDialog(
+                onDismissRequest = { showUnfriendDialog = false },
+                title = { Text("Xóa bạn") },
+                text = {
+                    Text("Xóa toàn bộ tin nhắn với $receiverName? Hành động này không thể hoàn tác và tin nhắn cũng sẽ mất ở phía $receiverName.")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showUnfriendDialog = false
+                        viewModel.unfriend(receiverId) { success ->
+                            if (success) {
+                                onBackClick()
+                            } else {
+                                Toast.makeText(context, "Xóa thất bại, thử lại nhé", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }) {
+                        Text("Xóa", color = Color.Red)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showUnfriendDialog = false }) { Text("Hủy") }
+                }
+            )
+        }
     }
 }
 
 @Composable
+
 fun ChatMessageItem(
     message: Message,
     isMe: Boolean,
+    darkMode: Boolean = false,
     onEditClick: () -> Unit = {},
     onDeleteClick: () -> Unit = {}
 ) {
@@ -383,7 +538,11 @@ fun ChatMessageItem(
                         bottomStart = if (isMe) 16.dp else 2.dp,
                         bottomEnd = if (isMe) 2.dp else 16.dp
                     ),
-                    color = if (isDeleted) Color(0xFFF0F0F0) else if (isMe) Color(0xFFE3F2FD) else Color.White,
+                    color = when {
+                        isDeleted -> if (darkMode) Color(0xFF242424) else Color(0xFFF0F0F0)
+                        isMe -> if (darkMode) Color(0xFF2B4C7E) else Color(0xFFE3F2FD)
+                        else -> if (darkMode) Color(0xFF2A2A2A) else Color.White
+                    },
                     shadowElevation = 1.dp,
                     modifier = Modifier
                         .widthIn(max = 280.dp)
@@ -432,7 +591,11 @@ fun ChatMessageItem(
                             Text(
                                 text = message.text,
                                 fontSize = 15.sp,
-                                color = if (isDeleted) Color.Gray else Color.Black,
+                                color = when {
+                                    isDeleted -> if (darkMode) Color(0xFFA0A0A0) else Color.Gray
+                                    darkMode -> Color(0xFFF2F2F2)
+                                    else -> Color.Black
+                                },
                                 fontStyle = if (isDeleted) FontStyle.Italic else FontStyle.Normal,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                             )
