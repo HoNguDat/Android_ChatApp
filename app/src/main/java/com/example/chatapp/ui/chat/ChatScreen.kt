@@ -56,17 +56,10 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.SolidColor
+import com.example.chatapp.ui.theme.AppThemeOption
+import com.example.chatapp.ui.theme.LocalAppColors
+import com.example.chatapp.ui.theme.LocalThemeController
 
-private val chatBackgroundOptions = listOf(
-    "Mặc định" to Color(0xFFE2E7ED),
-    "Trắng" to Color.White,
-    "Hồng nhạt" to Color(0xFFFCE4EC),
-    "Xanh lá nhạt" to Color(0xFFE8F5E9),
-    "Tím nhạt" to Color(0xFFEDE7F6),
-    "Xám đậm" to Color(0xFF37474F),
-    "Xanh navy" to Color(0xFF0D1B2A),
-    "Đen" to Color(0xFF121212)
-)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
@@ -88,16 +81,15 @@ fun ChatScreen(
     var showTopMenu by remember { mutableStateOf(false) }
 
     // State màu nền khung Chat (Mặc định là màu #E2E7ED)
-    val prefs = remember { context.getSharedPreferences("chat_prefs", Context.MODE_PRIVATE) }
-    var chatBackgroundColor by remember(receiverId) {
-        mutableStateOf(Color(prefs.getInt("bg_$receiverId", 0xFFE2E7ED.toInt())))
-    }
-    // Nền tối thì cả khung nhập, bong bóng, chữ đều chuyển sang bản tối
-    val isDarkBg = chatBackgroundColor.luminance() < 0.5f
-    val barColor = if (isDarkBg) Color(0xFF1E1E1E) else Color.White
-    val inputBg = if (isDarkBg) Color(0xFF2A2A2A) else Color(0xFFF1F2F4)
-    val mainText = if (isDarkBg) Color(0xFFF2F2F2) else Color.Black
-    val subText = if (isDarkBg) Color(0xFFA0A0A0) else Color.Gray
+    // Màu lấy từ theme chung của cả app
+    val c = LocalAppColors.current
+    val themeController = LocalThemeController.current
+    val chatBackgroundColor = c.chatBackground
+    val isDarkBg = c.isDark
+    val barColor = c.surface
+    val inputBg = c.inputField
+    val mainText = c.textPrimary
+    val subText = c.textSecondary
 
     var showBackgroundDialog by remember { mutableStateOf(false) }
     var showUnfriendDialog by remember { mutableStateOf(false) }
@@ -411,44 +403,46 @@ fun ChatScreen(
             )
         }
 
-        // Bảng màu chọn nền khung chat
+        // Chọn theme: đổi màu cả app
         if (showBackgroundDialog) {
             AlertDialog(
                 onDismissRequest = { showBackgroundDialog = false },
-                title = { Text("Chọn màu nền") },
+                title = { Text("Chỉnh sửa màu nền") },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        chatBackgroundOptions.chunked(4).forEach { rowItems ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                rowItems.forEach { (name, color) ->
-                                    val selected = color == chatBackgroundColor
+                    Column {
+                        AppThemeOption.entries.forEach { option ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { themeController.onChange(option) }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(option.colors.background)
+                                        .border(1.dp, c.divider, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(40.dp)
+                                            .size(12.dp)
                                             .clip(CircleShape)
-                                            .background(color)
-                                            .border(
-                                                width = if (selected) 3.dp else 1.dp,
-                                                color = if (selected) ZaloPrimaryColor else Color.LightGray,
-                                                shape = CircleShape
-                                            )
-                                            .clickable {
-                                                chatBackgroundColor = color
-                                                prefs.edit()
-                                                    .putInt("bg_$receiverId", color.toArgb())
-                                                    .apply()
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (selected) {
-                                            Icon(
-                                                Icons.Default.Check,
-                                                contentDescription = name,
-                                                tint = if (color.luminance() > 0.5f) Color.Black else Color.White
-                                            )
-                                        }
-                                    }
+                                            .background(option.colors.accent)
+                                    )
                                 }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = option.label,
+                                    color = c.textPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                RadioButton(
+                                    selected = option == themeController.current,
+                                    onClick = { themeController.onChange(option) }
+                                )
                             }
                         }
                     }

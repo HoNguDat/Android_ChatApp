@@ -29,6 +29,7 @@ import com.example.chatapp.ui.profile.ProfileScreen
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.chatapp.ui.theme.LocalAppColors
 val ZaloPrimaryColor = Color(0xFF0068FF)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,12 +46,12 @@ fun HomeScreen(
     val editName by viewModel.editName.collectAsState()
     val editPhone by viewModel.editPhone.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
-
+    val c = LocalAppColors.current
     Scaffold(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = ZaloPrimaryColor,
+                    containerColor = c.topBar,
                     titleContentColor = Color.White,
                     actionIconContentColor = Color.White
                 ),
@@ -113,7 +114,7 @@ fun HomeScreen(
         },
         bottomBar = {
             NavigationBar(
-                containerColor = Color.White,
+                containerColor = c.surface,
                 tonalElevation = 8.dp
             ) {
                 NavigationBarItem(
@@ -122,9 +123,12 @@ fun HomeScreen(
                     icon = { Icon(Icons.Default.Chat, contentDescription = "Tin nhắn") },
                     label = { Text("Tin nhắn") },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = ZaloPrimaryColor,
-                        selectedTextColor = ZaloPrimaryColor,
-                        indicatorColor = Color(0xFFE8F1FF)
+                        selectedIconColor = c.accent,
+                        selectedTextColor = c.accent,
+                        indicatorColor = c.navIndicator,
+                        unselectedIconColor = c.textSecondary,
+                        unselectedTextColor = c.textSecondary
+
                     )
                 )
                 NavigationBarItem(
@@ -133,9 +137,11 @@ fun HomeScreen(
                     icon = { Icon(Icons.Default.Person, contentDescription = "Cá nhân") },
                     label = { Text("Cá nhân") },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = ZaloPrimaryColor,
-                        selectedTextColor = ZaloPrimaryColor,
-                        indicatorColor = Color(0xFFE8F1FF)
+                        selectedIconColor = c.accent,
+                        selectedTextColor = c.accent,
+                        indicatorColor = c.navIndicator,
+                        unselectedIconColor = c.textSecondary,
+                        unselectedTextColor = c.textSecondary
                     )
                 )
             }
@@ -145,7 +151,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFF4F5F7))
+                .background(c.background)
         ) {
             when (selectedTab) {
 
@@ -158,7 +164,7 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = if (searchQuery.isEmpty()) "Chưa có người dùng nào" else "Không tìm thấy kết quả",
-                                color = Color.Gray,
+                                color = c.textSecondary,
                                 fontSize = 15.sp
                             )
                         }
@@ -174,7 +180,7 @@ fun HomeScreen(
                                 HorizontalDivider(
                                     modifier = Modifier.padding(start = 76.dp),
                                     thickness = 0.5.dp,
-                                    color = Color(0xFFE5E5E5)
+                                    color = c.divider
                                 )
                             }
                         }
@@ -209,6 +215,7 @@ fun ZaloConversationItem(
     conversation: ChatConversation,
     onClick: () -> Unit
 ) {
+    val c = LocalAppColors.current
     val user = conversation.otherUser
     val isUnread = !conversation.isRead
     val formattedTime = remember(conversation.lastTimestamp) {
@@ -219,7 +226,7 @@ fun ZaloConversationItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (isUnread) Color(0xFFEDF5FF) else Color.White)
+            .background(if (isUnread) c.unreadBg else c.surface)
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -229,12 +236,12 @@ fun ZaloConversationItem(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(CircleShape)
-                    .background(ZaloPrimaryColor.copy(alpha = 0.85f)),
+                    .background(c.accent.copy(alpha = 0.85f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = user.name.take(1).uppercase(),
-                    color = Color.White,
+                    color = c.onAccent,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -245,7 +252,7 @@ fun ZaloConversationItem(
                     modifier = Modifier
                         .size(13.dp)
                         .clip(CircleShape)
-                        .background(Color.White)
+                        .background(c.surface)
                         .padding(2.dp)
                         .align(Alignment.BottomEnd)
                 ) {
@@ -274,7 +281,7 @@ fun ZaloConversationItem(
                     text = user.name,
                     fontSize = 16.sp,
                     fontWeight = if (isUnread) FontWeight.Bold else FontWeight.SemiBold,
-                    color = Color.Black,
+                    color = c.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -284,7 +291,7 @@ fun ZaloConversationItem(
                     text = formattedTime,
                     fontSize = 12.sp,
                     fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isUnread) ZaloPrimaryColor else Color.Gray
+                    color = if (isUnread) c.accent else c.textSecondary
                 )
             }
 
@@ -305,7 +312,7 @@ fun ZaloConversationItem(
                     text = displayText,
                     fontSize = 14.sp,
                     fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isUnread) Color.Black else Color.Gray,
+                    color = if (isUnread) c.textPrimary else c.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -316,7 +323,7 @@ fun ZaloConversationItem(
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(ZaloPrimaryColor)
+                            .background(c.accent)
                     )
                 }
             }
