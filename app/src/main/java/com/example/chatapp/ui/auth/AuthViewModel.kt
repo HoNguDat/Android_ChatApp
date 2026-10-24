@@ -73,4 +73,14 @@ class AuthViewModel(
             }
         }
     }
+
+    // Đổi mật khẩu
+    fun changePassword(
+        oldPass: String,
+        newPass: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        repository.changePassword(oldPass, newPass, onSuccess, onError)
+    }
 }
