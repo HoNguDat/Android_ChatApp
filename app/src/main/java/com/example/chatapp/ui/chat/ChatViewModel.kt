@@ -60,7 +60,12 @@ class ChatViewModel(
             repository.getUserStatus(receiverId).collect { _receiverStatus.value = it }
         }
     }
-
+    fun unfriend(receiverId: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.deleteConversation(receiverId)
+            onResult(result.isSuccess)
+        }
+    }
     fun acceptChat(receiverId: String) {
         viewModelScope.launch {
             repository.updateChatStatus(receiverId, "ACCEPTED")

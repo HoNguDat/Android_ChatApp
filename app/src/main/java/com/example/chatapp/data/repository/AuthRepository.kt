@@ -198,7 +198,19 @@ class AuthRepository(
         messagesRef.addValueEventListener(listener)
         awaitClose { messagesRef.removeEventListener(listener) }
     }
+    // Xóa bạn: xóa toàn bộ tin nhắn + trạng thái chat giữa 2 người
+    suspend fun deleteConversation(receiverId: String): Result<Boolean> {
+        val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
+        val chatRoomId = getChatRoomId(senderId, receiverId)
 
+        return try {
+            db.reference.child("chats").child(chatRoomId).removeValue().await()
+            db.reference.child("chat_status").child(chatRoomId).removeValue().await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
     suspend fun markMessagesAsRead(receiverId: String) {
         val senderId = currentUserId ?: return
         val chatRoomId = getChatRoomId(senderId, receiverId)
@@ -226,7 +238,7 @@ class AuthRepository(
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val conversationMap = mutableMapOf<String, ChatConversation>()
-
+                var matchedRooms = 0
                 for (roomSnapshot in snapshot.children) {
                     val roomId = roomSnapshot.key ?: continue
                     if (roomId.contains(myUid)) {
@@ -239,7 +251,7 @@ class AuthRepository(
                         if (messages.isNotEmpty()) {
                             val lastMsg = messages.maxByOrNull { it.timestamp }!!
                             val otherUserId = if (lastMsg.senderId == myUid) lastMsg.receiverId else lastMsg.senderId
-
+                            matchedRooms++
                             usersRef.child(otherUserId).get().addOnSuccessListener { userSnapshot ->
                                 val otherUser = userSnapshot.getValue(User::class.java)
                                 if (otherUser != null) {
@@ -258,7 +270,7 @@ class AuthRepository(
                         }
                     }
                 }
-                if (!snapshot.hasChildren()) {
+                if (matchedRooms == 0) {
                     trySend(emptyList())
                 }
             }
@@ -422,5 +434,33 @@ class AuthRepository(
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
+    //đổi mật khẩu
+    fun changePassword(
+        oldPass: String,
+        newPass: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = auth.currentUser
+        if (user != null && user.email != null) {
+            // 1. Xác thực lại với mật khẩu cũ
+            val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(user.email!!, oldPass)
+            user.reauthenticate(credential).addOnCompleteListener { reAuthTask ->
+                if (reAuthTask.isSuccessful) {
+                    // 2. Nếu đúng MK cũ -> Tiến hành cập nhật MK mới
+                    user.updatePassword(newPass).addOnCompleteListener { updateTask ->
+                        if (updateTask.isSuccessful) {
+                            onSuccess()
+                        } else {
+                            onError(updateTask.exception?.localizedMessage ?: "Cập nhật mật khẩu thất bại")
+                        }
+                    }
+                } else {
+                    onError("Mật khẩu hiện tại không chính xác")
+                }
+            }
+        } else {
+            onError("Không tìm thấy thông tin đăng nhập")
+        }
     }
 }
