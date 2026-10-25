@@ -9,7 +9,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-
+import kotlinx.coroutines.flow.onStart
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class HomeViewModel(
     private val repository: AuthRepository = AuthRepository()
@@ -20,7 +20,7 @@ class HomeViewModel(
     // Lắng nghe Real-Time người dùng & tin nhắn mới nhất
     val conversations: StateFlow<List<ChatConversation>> = combine(
         repository.getUsers(),
-        repository.getRecentConversations(),
+        repository.getRecentConversations().onStart { emit(emptyList()) },
         searchQuery.debounce(300).distinctUntilChanged()
     ) { users, recentChats, query ->
         val cleanQuery = query.trim()

@@ -24,6 +24,13 @@ import com.example.chatapp.data.model.User
 import com.example.chatapp.ui.home.ZaloPrimaryColor
 import com.example.chatapp.ui.theme.LocalAppColors
 
+import android.widget.Toast
+import androidx.compose.material.icons.filled.Lock // [THÊM MỚI: Icon khóa cho nút Đổi mật khẩu]
+import androidx.compose.runtime.* // [THÊM MỚI: Thêm mutableStateOf, remember]
+import androidx.compose.ui.platform.LocalContext // [THÊM MỚI: Lấy Context cho Toast]
+import androidx.compose.ui.text.input.PasswordVisualTransformation // [THÊM MỚI: Ẩn mật khẩu bằng dấu chấm]
+import com.example.chatapp.ui.auth.AuthViewModel // [THÊM MỚI: Nhận ViewModel để gọi hàm đổi mật khẩu]
+
 @Composable
 fun ProfileScreen(
     user: User?,
@@ -35,9 +42,17 @@ fun ProfileScreen(
     onEditPhoneChange: (String) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    authViewModel: AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel() // <-- THÊM DÒNG NÀY VÀO
 ) {
     val c = LocalAppColors.current
+    // ================= [THÊM MỚI: Quản lý trạng thái Dialog đổi mật khẩu] =================
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var oldPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    // ===================================================================================
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -156,6 +171,22 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        // ================= [THÊM MỚI: NÚT ĐỔI MẬT KHẨU] =================
+        OutlinedButton(
+            onClick = { showPasswordDialog = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = ZaloPrimaryColor)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Đổi mật khẩu", color = ZaloPrimaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        // ================================================================
+
         // Nút Đăng xuất ở cuối màn hình
         Button(
             onClick = onLogout,
@@ -170,6 +201,79 @@ fun ProfileScreen(
             Text("Đăng xuất", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
+
+    // ================= [THÊM MỚI: HỘP THOẠI DIALOG ĐỔI MẬT KHẨU] =================
+    if (showPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showPasswordDialog = false
+                oldPassword = ""
+                newPassword = ""
+            },
+            title = { Text("Đổi mật khẩu tài khoản", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = oldPassword,
+                        onValueChange = { oldPassword = it },
+                        label = { Text("Mật khẩu hiện tại") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = newPassword,
+                        onValueChange = { newPassword = it },
+                        label = { Text("Mật khẩu mới (tối thiểu 6 ký tự)") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (oldPassword.isEmpty() || newPassword.isEmpty()) {
+                            Toast.makeText(context, "Vui lòng nhập đầy đủ mật khẩu!", Toast.LENGTH_SHORT).show()
+                        } else if (newPassword.length < 6) {
+                            Toast.makeText(context, "Mật khẩu mới phải có ít nhất 6 ký tự!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // Gọi hàm trong AuthViewModel
+                            authViewModel.changePassword(
+                                oldPass = oldPassword,
+                                newPass = newPassword,
+                                onSuccess = {
+                                    Toast.makeText(context, "Đổi mật khẩu thành công!", Toast.LENGTH_SHORT).show()
+                                    showPasswordDialog = false
+                                    oldPassword = ""
+                                    newPassword = ""
+                                },
+                                onError = { errorMsg ->
+                                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
+                    }
+                ) {
+                    Text("Cập nhật")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPasswordDialog = false
+                        oldPassword = ""
+                        newPassword = ""
+                    }
+                ) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+    // ============================================================================
 }
 
 // Extension nhỏ hỗ trợ check null/blank

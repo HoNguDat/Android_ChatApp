@@ -390,4 +390,34 @@ class AuthRepository(
             Result.failure(e)
         }
     }
+
+    //đổi mật khẩu
+    fun changePassword(
+        oldPass: String,
+        newPass: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = auth.currentUser
+        if (user != null && user.email != null) {
+            // 1. Xác thực lại với mật khẩu cũ
+            val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(user.email!!, oldPass)
+            user.reauthenticate(credential).addOnCompleteListener { reAuthTask ->
+                if (reAuthTask.isSuccessful) {
+                    // 2. Nếu đúng MK cũ -> Tiến hành cập nhật MK mới
+                    user.updatePassword(newPass).addOnCompleteListener { updateTask ->
+                        if (updateTask.isSuccessful) {
+                            onSuccess()
+                        } else {
+                            onError(updateTask.exception?.localizedMessage ?: "Cập nhật mật khẩu thất bại")
+                        }
+                    }
+                } else {
+                    onError("Mật khẩu hiện tại không chính xác")
+                }
+            }
+        } else {
+            onError("Không tìm thấy thông tin đăng nhập")
+        }
+    }
 }
