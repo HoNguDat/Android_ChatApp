@@ -73,6 +73,7 @@ fun ChatScreen(
     val messages by viewModel.messages.collectAsState()
     val chatStatus by viewModel.chatStatus.collectAsState()
     val isUploading by viewModel.isUploading.collectAsState()
+    val receiverStatus by viewModel.receiverStatus.collectAsState()
     val currentUserId = viewModel.currentUserId
     val listState = rememberLazyListState()
     val context = LocalContext.current
@@ -155,7 +156,11 @@ fun ChatScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(text = receiverName, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Đang hoạt động", fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f))
+                            Text(
+                                text = if (receiverStatus == "ONLINE") "Đang hoạt động" else "Không hoạt động",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
                         }
                     }
                 },

@@ -26,8 +26,12 @@ class ChatViewModel(
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
 
     val currentUserId: String? get() = repository.currentUserId
+
+    private val _receiverStatus = MutableStateFlow("OFFLINE")
+    val receiverStatus: StateFlow<String> = _receiverStatus.asStateFlow()
     private var listenJob: Job? = null
     private var statusJob: Job? = null
+    private var presenceJob: Job? = null
 
     fun loadMessages(receiverId: String) {
         listenJob?.cancel()
@@ -49,6 +53,11 @@ class ChatViewModel(
             repository.getChatStatus(receiverId).collect { status ->
                 _chatStatus.value = status
             }
+        }
+
+        presenceJob?.cancel()
+        presenceJob = viewModelScope.launch {
+            repository.getUserStatus(receiverId).collect { _receiverStatus.value = it }
         }
     }
     fun unfriend(receiverId: String, onResult: (Boolean) -> Unit = {}) {
