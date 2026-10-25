@@ -20,7 +20,8 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
 import java.io.ByteArrayOutputStream
-
+import android.os.Handler
+import android.os.Looper
 class AuthRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val db: FirebaseDatabase = FirebaseDatabase.getInstance(
@@ -59,7 +60,7 @@ class AuthRepository(
                 .child(uid)
                 .setValue(user)
                 .await()
-
+            goOnline()
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
@@ -72,6 +73,7 @@ class AuthRepository(
     ): Result<Boolean> {
         return try {
             auth.signInWithEmailAndPassword(email, pass).await()
+            goOnline()
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
@@ -79,7 +81,24 @@ class AuthRepository(
     }
 
     fun logout() {
-        auth.signOut()
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            auth.signOut()
+            return
+        }
+        val statusRef = db.reference.child("users").child(uid).child("status")
+        statusRef.onDisconnect().cancel()
+
+        // Ghi OFFLINE trước rồi mới signOut; tối đa chờ 2 giây để mất mạng vẫn đăng xuất được
+        var done = false
+        val finish = {
+            if (!done) {
+                done = true
+                auth.signOut()
+            }
+        }
+        statusRef.setValue("OFFLINE").addOnCompleteListener { finish() }
+        Handler(Looper.getMainLooper()).postDelayed({ finish() }, 2000)
     }
 
     fun getUsers(): Flow<List<User>> = callbackFlow {
@@ -377,5 +396,31 @@ class AuthRepository(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    fun goOnline() {
+        val uid = auth.currentUser?.uid ?: return
+        val ref = db.reference.child("users").child(uid).child("status")
+        ref.onDisconnect().setValue("OFFLINE")   // mất kết nối -> Firebase tự đặt OFFLINE
+        ref.setValue("ONLINE")
+    }
+
+    fun goOffline() {
+        val uid = auth.currentUser?.uid ?: return
+        db.reference.child("users").child(uid).child("status").setValue("OFFLINE")
+    }
+
+    fun getUserStatus(userId: String): Flow<String> = callbackFlow {
+        val ref = db.reference.child("users").child(userId).child("status")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                trySend(snapshot.getValue(String::class.java) ?: "OFFLINE")
+            }
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
     }
 }
