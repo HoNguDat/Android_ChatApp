@@ -128,7 +128,11 @@ class AuthRepository(
     }
 
     // Gửi tin nhắn: Tự động khởi tạo trạng thái PENDING nếu chưa từng chat, chặn nếu đã bị DECLINED
-    suspend fun sendMediaMessage(receiverId: String, text: String = "", imageUrl: String? = null): Result<Boolean> {
+    suspend fun sendMediaMessage(
+        receiverId: String,
+        text: String = "",
+        imageUrl: String? = null
+    ): Result<Boolean> {
         val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
         val chatRoomId = getChatRoomId(senderId, receiverId)
         val statusRef = db.reference.child("chat_status").child(chatRoomId)
@@ -198,7 +202,8 @@ class AuthRepository(
         messagesRef.addValueEventListener(listener)
         awaitClose { messagesRef.removeEventListener(listener) }
     }
-    // Xóa bạn: xóa toàn bộ tin nhắn + trạng thái chat giữa 2 người
+
+    // Xóa trò chuyện
     suspend fun deleteConversation(receiverId: String): Result<Boolean> {
         val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
         val chatRoomId = getChatRoomId(senderId, receiverId)
@@ -211,6 +216,7 @@ class AuthRepository(
             Result.failure(e)
         }
     }
+
     suspend fun markMessagesAsRead(receiverId: String) {
         val senderId = currentUserId ?: return
         val chatRoomId = getChatRoomId(senderId, receiverId)
@@ -250,12 +256,14 @@ class AuthRepository(
 
                         if (messages.isNotEmpty()) {
                             val lastMsg = messages.maxByOrNull { it.timestamp }!!
-                            val otherUserId = if (lastMsg.senderId == myUid) lastMsg.receiverId else lastMsg.senderId
+                            val otherUserId =
+                                if (lastMsg.senderId == myUid) lastMsg.receiverId else lastMsg.senderId
                             matchedRooms++
                             usersRef.child(otherUserId).get().addOnSuccessListener { userSnapshot ->
                                 val otherUser = userSnapshot.getValue(User::class.java)
                                 if (otherUser != null) {
-                                    val isRead = if (lastMsg.senderId != myUid) lastMsg.isRead else true
+                                    val isRead =
+                                        if (lastMsg.senderId != myUid) lastMsg.isRead else true
                                     conversationMap[otherUserId] = ChatConversation(
                                         otherUser = otherUser,
                                         lastMessage = lastMsg.text,
@@ -263,7 +271,8 @@ class AuthRepository(
                                         lastSenderId = lastMsg.senderId,
                                         isRead = isRead
                                     )
-                                    val sortedList = conversationMap.values.sortedByDescending { it.lastTimestamp }
+                                    val sortedList =
+                                        conversationMap.values.sortedByDescending { it.lastTimestamp }
                                     trySend(sortedList)
                                 }
                             }
@@ -352,7 +361,8 @@ class AuthRepository(
         val myUid = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
         val chatRoomId = getChatRoomId(myUid, receiverId)
         return try {
-            db.reference.child("chat_status").child(chatRoomId).child("status").setValue(newStatus).await()
+            db.reference.child("chat_status").child(chatRoomId).child("status").setValue(newStatus)
+                .await()
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
@@ -378,6 +388,7 @@ class AuthRepository(
             null
         }
     }
+
     // Xóa tin nhắn (Cập nhật text thành "Tin nhắn đã được xóa" và ẩn imageUrl)
     suspend fun deleteMessage(receiverId: String, messageId: String): Result<Boolean> {
         val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
@@ -397,7 +408,11 @@ class AuthRepository(
     }
 
     // Chỉnh sửa nội dung tin nhắn
-    suspend fun editMessage(receiverId: String, messageId: String, newText: String): Result<Boolean> {
+    suspend fun editMessage(
+        receiverId: String,
+        messageId: String,
+        newText: String
+    ): Result<Boolean> {
         val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
         val chatRoomId = getChatRoomId(senderId, receiverId)
         val msgRef = db.reference.child("chats").child(chatRoomId).child(messageId)
@@ -428,39 +443,45 @@ class AuthRepository(
             override fun onDataChange(snapshot: DataSnapshot) {
                 trySend(snapshot.getValue(String::class.java) ?: "OFFLINE")
             }
+
             override fun onCancelled(error: DatabaseError) {
                 close(error.toException())
             }
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    //đổi mật khẩu
-    fun changePassword(
-        oldPass: String,
-        newPass: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val user = auth.currentUser
-        if (user != null && user.email != null) {
-            // 1. Xác thực lại với mật khẩu cũ
-            val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(user.email!!, oldPass)
-            user.reauthenticate(credential).addOnCompleteListener { reAuthTask ->
-                if (reAuthTask.isSuccessful) {
-                    // 2. Nếu đúng MK cũ -> Tiến hành cập nhật MK mới
-                    user.updatePassword(newPass).addOnCompleteListener { updateTask ->
-                        if (updateTask.isSuccessful) {
-                            onSuccess()
-                        } else {
-                            onError(updateTask.exception?.localizedMessage ?: "Cập nhật mật khẩu thất bại")
+    }
+        //đổi mật khẩu
+        fun changePassword(
+            oldPass: String,
+            newPass: String,
+            onSuccess: () -> Unit,
+            onError: (String) -> Unit
+        ) {
+            val user = auth.currentUser
+            if (user != null && user.email != null) {
+                // 1. Xác thực lại với mật khẩu cũ
+                val credential =
+                    com.google.firebase.auth.EmailAuthProvider.getCredential(user.email!!, oldPass)
+                user.reauthenticate(credential).addOnCompleteListener { reAuthTask ->
+                    if (reAuthTask.isSuccessful) {
+                        // 2. Nếu đúng MK cũ -> Tiến hành cập nhật MK mới
+                        user.updatePassword(newPass).addOnCompleteListener { updateTask ->
+                            if (updateTask.isSuccessful) {
+                                onSuccess()
+                            } else {
+                                onError(
+                                    updateTask.exception?.localizedMessage
+                                        ?: "Cập nhật mật khẩu thất bại"
+                                )
+                            }
                         }
+                    } else {
+                        onError("Mật khẩu hiện tại không chính xác")
                     }
-                } else {
-                    onError("Mật khẩu hiện tại không chính xác")
                 }
+            } else {
+                onError("Không tìm thấy thông tin đăng nhập")
             }
-        } else {
-            onError("Không tìm thấy thông tin đăng nhập")
         }
     }
-}

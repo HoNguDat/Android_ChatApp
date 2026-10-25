@@ -189,9 +189,9 @@ fun ChatScreen(
                                 }
                             )
 
-                            // 2. Xóa bạn (Đưa về trạng thái chưa kết bạn/xóa quan hệ)
+                            // 2. Xóa cuộc trò chuyện
                             DropdownMenuItem(
-                                text = { Text("Xóa bạn", color = Color.Red) },
+                                text = { Text("Xóa cuộc trò chuyện", color = Color.Red) },
                                 leadingIcon = {
                                     Icon(
                                         Icons.Default.Delete,
@@ -458,18 +458,18 @@ fun ChatScreen(
             )
         }
 
-        // Xác nhận xóa bạn
+        // Xác nhận xóa
         if (showUnfriendDialog) {
             AlertDialog(
                 onDismissRequest = { showUnfriendDialog = false },
-                title = { Text("Xóa bạn") },
+                title = { Text("Xóa cuộc trò chuyện") },
                 text = {
                     Text("Xóa toàn bộ tin nhắn với $receiverName? Hành động này không thể hoàn tác và tin nhắn cũng sẽ mất ở phía $receiverName.")
                 },
                 confirmButton = {
                     TextButton(onClick = {
                         showUnfriendDialog = false
-                        viewModel.unfriend(receiverId) { success ->
+                        viewModel.deleteConversation(receiverId) { success ->
                             if (success) {
                                 onBackClick()
                             } else {
