@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chatapp.data.model.User
 import com.example.chatapp.ui.home.ZaloPrimaryColor
+import com.example.chatapp.ui.theme.LocalAppColors
 
 import android.widget.Toast
 import androidx.compose.material.icons.filled.Lock // [THÊM MỚI: Icon khóa cho nút Đổi mật khẩu]
@@ -44,6 +45,7 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     authViewModel: AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel() // <-- THÊM DÒNG NÀY VÀO
 ) {
+    val c = LocalAppColors.current
     // ================= [THÊM MỚI: Quản lý trạng thái Dialog đổi mật khẩu] =================
     var showPasswordDialog by remember { mutableStateOf(false) }
     var oldPassword by remember { mutableStateOf("") }
@@ -60,7 +62,7 @@ fun ProfileScreen(
         // Card chứa thông tin cá nhân
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = c.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
@@ -75,12 +77,12 @@ fun ProfileScreen(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(ZaloPrimaryColor),
+                        .background(c.accent),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = user?.name?.take(1)?.uppercase() ?: "U",
-                        color = Color.White,
+                        color = c.onAccent,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -132,7 +134,7 @@ fun ProfileScreen(
                             text = user?.name ?: "Người dùng",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            color = c.textPrimary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
@@ -142,7 +144,7 @@ fun ProfileScreen(
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Chỉnh sửa",
-                                tint = ZaloPrimaryColor
+                                tint = c.accent
                             )
                         }
                     }
@@ -152,7 +154,7 @@ fun ProfileScreen(
                     Text(
                         text = user?.email ?: "",
                         fontSize = 14.sp,
-                        color = Color.Gray
+                        color = c.textSecondary
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -161,7 +163,7 @@ fun ProfileScreen(
                     Text(
                         text = if (!user?.phone.isNull_or_blank()) "SĐT: ${user?.phone}" else "Chưa cập nhật SĐT",
                         fontSize = 14.sp,
-                        color = Color.DarkGray
+                        color = c.textTertiary
                     )
                 }
             }

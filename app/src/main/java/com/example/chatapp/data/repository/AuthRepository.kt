@@ -179,7 +179,19 @@ class AuthRepository(
         messagesRef.addValueEventListener(listener)
         awaitClose { messagesRef.removeEventListener(listener) }
     }
+    // Xóa bạn: xóa toàn bộ tin nhắn + trạng thái chat giữa 2 người
+    suspend fun deleteConversation(receiverId: String): Result<Boolean> {
+        val senderId = currentUserId ?: return Result.failure(Exception("Chưa đăng nhập"))
+        val chatRoomId = getChatRoomId(senderId, receiverId)
 
+        return try {
+            db.reference.child("chats").child(chatRoomId).removeValue().await()
+            db.reference.child("chat_status").child(chatRoomId).removeValue().await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
     suspend fun markMessagesAsRead(receiverId: String) {
         val senderId = currentUserId ?: return
         val chatRoomId = getChatRoomId(senderId, receiverId)
@@ -207,7 +219,7 @@ class AuthRepository(
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val conversationMap = mutableMapOf<String, ChatConversation>()
-
+                var matchedRooms = 0
                 for (roomSnapshot in snapshot.children) {
                     val roomId = roomSnapshot.key ?: continue
                     if (roomId.contains(myUid)) {
@@ -220,7 +232,7 @@ class AuthRepository(
                         if (messages.isNotEmpty()) {
                             val lastMsg = messages.maxByOrNull { it.timestamp }!!
                             val otherUserId = if (lastMsg.senderId == myUid) lastMsg.receiverId else lastMsg.senderId
-
+                            matchedRooms++
                             usersRef.child(otherUserId).get().addOnSuccessListener { userSnapshot ->
                                 val otherUser = userSnapshot.getValue(User::class.java)
                                 if (otherUser != null) {
@@ -239,7 +251,7 @@ class AuthRepository(
                         }
                     }
                 }
-                if (!snapshot.hasChildren()) {
+                if (matchedRooms == 0) {
                     trySend(emptyList())
                 }
             }
